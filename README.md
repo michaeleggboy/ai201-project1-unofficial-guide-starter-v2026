@@ -32,18 +32,18 @@ questions the corpus doesn't cover, rather than guessing.
 
 ## Chunking Strategy
 
-**Chunk size:**
-**Overlap:**
+**Chunk size:** 800 characters (fallback only)
+**Overlap:** 80 characters (fallback only)
 
-<!-- What about YOUR documents made you pick these numbers? Short posts and
-     long sectioned guides don't want the same chunking, and "800 seemed
-     reasonable" earns nothing. Point at something you noticed when you read
-     the documents in Milestone 1.
-
-     If you changed your mind partway through, say so and say why. That's worth
-     more than pretending you got it right first time.
-
-     Milestone 3. -->
+My corpus mixes short posts and long sectioned guides, so a fixed character
+window doesn't fit either: it never triggers on short posts, and on guides
+it cuts through town names and facts, since entries range from 150 to 400
+characters. I split on structure instead: each paragraph is a chunk, and
+headers get prepended as context so a fact keeps its section. I only
+fall back to the 800/80 character window for the rare paragraph too long to
+keep whole. I originally kept only the nearest header as context, but that
+dropped the town name on documents titled after a single town, so I switched
+to keeping the full header path.
 
 ## Sample Chunks
 
