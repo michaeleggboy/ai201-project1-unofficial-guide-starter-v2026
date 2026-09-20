@@ -2,26 +2,9 @@
 Stage 2 of the pipeline: splitting documents into chunks.
 
 ⚠️ THIS IS THE FILE YOU CHANGE IN MILESTONE 3.
-
-`split_documents` below is deliberately plain. It cuts every document into
-fixed-size pieces with a fixed overlap and pays no attention to where sentences
-or paragraphs end. It works, and it is not good.
-
-On a corpus of short posts it may not cut anything at all: `campus_life` comes
-out as 88 documents and 88 chunks, because almost nothing in it reaches 800
-characters. That is the baseline, not a bug — Milestone 3 is where you decide
-whether one post should stay one chunk.
-
-Your job in Milestone 3 is to replace the *body* of `split_documents` with a
-strategy that fits the documents you actually read in Milestone 1. Keep the
-name and the shape of what it returns — the rest of the pipeline calls it, and
-your README has to name the function that produced your chunks.
-
-If you get stuck for 30 minutes, `fallback_split` is the original. Switch back
-to it, write down what you saw, and move on. That's a real observation about
-your pipeline, not giving up.
 """
 
+import re
 from dataclasses import dataclass
 
 import config
@@ -80,24 +63,121 @@ def fallback_split(
     return chunks
 
 
+_HEADER_RE = re.compile(r"^(#{1,6})\s+(.*)")
+
+
+def _paragraphs(text: str) -> list[str]:
+    return [p.strip() for p in re.split(r"\n\s*\n", text) if p.strip()]
+
+
+def _oversized_split(
+    text: str, source: str, index: int, chunk_size: int, overlap: int
+) -> list[Chunk]:
+    """A single paragraph too big to trust whole falls back to char windows."""
+    chunks: list[Chunk] = []
+    start = 0
+    while start < len(text):
+        piece = text[start : start + chunk_size].strip()
+        if piece:
+            chunks.append(
+                Chunk(
+                    text=piece,
+                    source=source,
+                    index=index,
+                    produced_by="chunker.py::split_documents",
+                )
+            )
+            index += 1
+        start += chunk_size - overlap
+    return chunks
+
+
+def _split_single_document(doc: Document, chunk_size: int, overlap: int) -> list[Chunk]:
+    paragraphs = _paragraphs(doc.text)
+    has_headers = any(_HEADER_RE.match(p) for p in paragraphs)
+
+    # Short, unstructured documents (the campus_life case): no headers, and
+    # the whole thing already fits in one chunk. Leave it alone rather than
+    # slicing a three-sentence post into fragments.
+    if not has_headers and len(doc.text) <= chunk_size:
+        return [
+            Chunk(
+                text=doc.text.strip(),
+                source=doc.source,
+                index=0,
+                produced_by="chunker.py::split_documents",
+            )
+        ]
+
+    chunks: list[Chunk] = []
+    index = 0
+    header_stack: list[tuple[int, str]] = []
+
+    for para in paragraphs:
+        header_match = _HEADER_RE.match(para)
+        if header_match:
+            level = len(header_match.group(1))
+            htext = header_match.group(2).strip()
+            header_stack = [h for h in header_stack if h[0] < level]
+            header_stack.append((level, htext))
+            continue
+
+        prefix = " — ".join(htext for _, htext in header_stack)
+        full = f"{prefix}\n\n{para}" if prefix else para
+
+        if len(full) <= chunk_size * 2:
+            chunks.append(
+                Chunk(
+                    text=full.strip(),
+                    source=doc.source,
+                    index=index,
+                    produced_by="chunker.py::split_documents",
+                )
+            )
+            index += 1
+        else:
+            oversized = _oversized_split(full, doc.source, index, chunk_size, overlap)
+            chunks.extend(oversized)
+            index += len(oversized)
+
+    return chunks or [
+        Chunk(
+            text=doc.text.strip(),
+            source=doc.source,
+            index=0,
+            produced_by="chunker.py::split_documents",
+        )
+    ]
+
+
 def split_documents(documents: list[Document]) -> list[Chunk]:
     """
-    Split documents into chunks. ⚠️ REPLACE THE BODY OF THIS IN MILESTONE 3.
+    Split on markdown structure instead of a fixed character count.
 
-    Right now it just calls the fallback. That is the plain, generic behaviour
-    the brief is talking about.
-
-    When you write your own strategy, set `produced_by` to
-    "chunker.py::split_documents" so your README's Sample Chunks section names
-    the right function. `app.py chunks` prints that string for you.
-
-    Things worth thinking about before you write any code:
-      - Are your documents short posts or long guides?
-      - Is the useful information in one sentence, or spread over a paragraph?
-      - Would splitting on paragraph breaks keep more thoughts intact than
-        splitting on a character count?
+      - A header line (#, ##, ###...) is never folded into a chunk's body;
+        it becomes context, prepended to every chunk below it, so a fact
+        never gets separated from the tier/section it belongs to. The full
+        path is prepended ("Brightwater — When to go"), not just the nearest
+        header: in a corpus of same-shaped guides the section names repeat
+        across every document and only the title tells them apart.
+      - Each paragraph becomes its own chunk. For a guide written as one
+        `**Name**` paragraph per entry, that means each entry stays a
+        single, self-contained chunk with its name and its facts together.
+      - A short, unstructured document (no headers, already under
+        chunk_size) is left as one chunk rather than split further — the
+        "should one post stay one chunk" call from the docstring above,
+        answered "yes" for short posts like campus_life's.
+      - A paragraph that's unusually long on its own (more than double
+        chunk_size) falls back to character-window splitting for just that
+        paragraph, so no chunk balloons unbounded.
     """
-    return fallback_split(documents)
+    chunk_size = config.CHUNK_SIZE
+    overlap = config.CHUNK_OVERLAP
+
+    chunks: list[Chunk] = []
+    for doc in documents:
+        chunks.extend(_split_single_document(doc, chunk_size, overlap))
+    return chunks
 
 
 def describe(chunks: list[Chunk]) -> str:
