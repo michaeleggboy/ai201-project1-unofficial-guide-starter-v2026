@@ -21,11 +21,14 @@ Michael Egbueze - Corpus: city_guides
 
 ## What This Does
 
-<!-- Three or four sentences. Which corpus you picked, and the kinds of
-     questions your system answers. Write it for someone who has never seen
-     this repo.
-
-     Milestone 5. -->
+This is a retrieval-augmented question-answering system built over a small
+corpus of travel guides describing towns in one region, with a focus on
+mobility and accessibility (how flat a town is, whether it has step-free
+transport, where the stepped lanes and hills are). It answers questions like
+"which towns are easy to get around with limited mobility" or "does Halden
+Bay have parking," pulling the answer from the specific town or section it
+belongs to rather than returning a generic summary. It also refuses
+questions the corpus doesn't cover, rather than guessing.
 
 ## Chunking Strategy
 
@@ -43,15 +46,6 @@ Michael Egbueze - Corpus: city_guides
      Milestone 3. -->
 
 ## Sample Chunks
-
-<!-- Five chunks, pasted as text. Label each one and name the file it came from
-     AND the function that produced it — the grader checks your code against
-     what you claim here.
-
-     `python app.py chunks -n 5` prints all three for you. Copy them straight
-     across.
-
-     Milestone 3. -->
 
 **Chunk 1** — source: ``guide_accessibility.md#0 — produced by: chunker.py::split_documents``
 
@@ -130,18 +124,21 @@ Sources retrieved: guide_brightwater.md, guide_seasons.md
 
 ## How I Used AI
 
-<!-- Two specific moments. For each: what you asked for, what came back, and
-     what you changed about it.
+**1.** I gave Claude the fixed-size `fallback_split` chunker and asked what
+chunk size and overlap actually do. Then I had it run the chunker against a
+real document. I found that a Kestrelford paragraph got split so the chunk
+containing "is built on a slope..." never mentioned Kestrelford at all. That
+showed me overlap alone wouldn't fix it, since town entries in my corpus are
+all different lengths.
 
-     "I asked Claude to write the chunking function from my notes. It ignored
-     the overlap, so I added that myself" is the level of detail we're after.
-     "I used AI to help me code" is not.
-
-     Milestone 5. -->
-
-**1.**
-
-**2.**
+**2.** I asked Claude to write `split_documents` as a structure-aware
+chunker: split on headers and paragraphs instead of character count. Its
+first version prepended only the nearest header to each chunk
+(`header_stack[-1]`). When I tested it on a document where the H1 was the
+town's name ("Halden Bay") and each `##` was a section ("Getting there",
+"When to go"), every chunk after the first lost the town name entirely. I
+had it fix this by joining the full header stack instead of just the last
+entry, so chunks now read "Halden Bay - Getting there [chunk content]".
 
 <!-- ── Stretch features ─────────────────────────────────────────────────────
      Doing one? Say so here BEFORE you start. A feature this README never
