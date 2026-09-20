@@ -98,30 +98,35 @@ Brightwater goes quiet to the point of dullness with the university empty.
 
 ## Sample Answer
 
-<!-- One complete question and answer, pasted as text, with the source line
-     visible. Milestone 4. -->
-
-**Question:**
+**Question:When should I go to Bridgewater?**
 
 **Answer:**
 
 ```
+  (best distance 0.457, cutoff 0.6)
+
+May and June are the best months to visit Brightwater, with late May being arguably the best week of the year because of long days, everything running, and the students being gone. Winter is cold, and several riverside businesses close entirely from January to March, while July and August are quiet to the point of being dull. 
+
+*(Sources: guide_brightwater.md and guide_seasons.md)*
+
+Sources retrieved: guide_brightwater.md, guide_seasons.md
 ```
 
-**My relevance cutoff:**
+**My relevance cutoff:0.6**
 
-<!-- The number you set in config.py, and how you got there.
-
-     You ran five questions your corpus covers and the five in OUT_OF_SCOPE
-     that it clearly doesn't, and wrote down the best distance for each. What
-     did those two groups look like? Where was the gap? Put the actual numbers
-     here — the table below wants all ten rows.
-
-     Milestone 4. -->
 
 | Question | In corpus? | Best distance |
 |---|---|---|
-|  |  |  |
+| Where is the good food?  | Yes | 0.540 |
+| When should I go to Bridgewater? | Yes | 0.457 |
+| Where is the regional hub? | Yes | 0.590 |
+| When do coastal business start closing? | Yes | 0.313 |
+| How is mobile coverage? | Yes | 0.486 |
+| What is the capital of Mongolia? | No | 0.808 |
+| How do I change the oil in a diesel engine? | No | 0.881 |
+| Who won the 1994 World Cup? | No | 0.982 |
+| What is the recommended dosage of ibuprofen for a headache? | No | 0.853 |
+| How do I write a for loop in Rust? | No | 0.859 |
 
 ## How I Used AI
 
