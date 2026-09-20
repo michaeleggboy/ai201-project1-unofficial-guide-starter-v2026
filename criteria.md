@@ -23,8 +23,7 @@ For at least 4 of my 5 test questions, the retrieved chunks include one that
 contains the answer.
 
 **Why this target:**
-<!-- e.g. "One of my questions is about a topic only two documents mention, so
-     I expect that one to be hard." -->
+One of my questions is specific to single document.
 
 ---
 
@@ -33,8 +32,7 @@ contains the answer.
 Every answer the system produces names at least one source document.
 
 **Why this target:**
-<!-- Why all five and not four? What about your setup makes that achievable —
-     or what would have to go wrong for it not to be? -->
+All my questions are pulled directly from the documents, so all corrects answers should be able to reference a document.
 
 ---
 
@@ -50,49 +48,26 @@ in at least 4 of 5 tries.
      just keep five of them, or the "4 of 5" above has nothing to be 4 of. -->
 
 **Why this target:**
-<!-- What did your distances look like when you set the cutoff in Milestone 4?
-     Was there a clean gap, or did the two groups overlap? -->
+It is safe bound as all five questions are fully out of scope of the documents. It allows just enough wriggle room where the RAG does not have to perfect but still good as identifying information it does not have information about.
 
 ---
 
 ## 4. Something about your chunks
 
-<!-- YOU WRITE THIS ONE.
-
-     How would you know if your chunks were the right size? Name something
-     countable or observable.
-
-     Examples of the right shape — don't copy these, they should come from
-     what you actually saw in Milestone 3:
-       - "At least 4 of 5 sampled chunks read as a complete thought, with no
-          sentence cut in half at either end."
-       - "No chunk is shorter than 200 characters, since anything below that
-          in my corpus turned out to be a heading with no content under it." -->
-
-
+At least 3 of 5 sampled chunks focus on the same topic.
 
 **Why this target:**
-
-
+This is good indicator that chunking will produce good answers. 3 of 5 allows wiggle room in case
+it is difficult to find a topical grouping.
 
 ---
 
 ## 5. Your choice
 
-<!-- YOU WRITE THIS ONE TOO.
-
-     Pick something you actually care about getting right. It could be about
-     speed, about refusals, about a particular kind of question your corpus
-     handles badly, about source attribution being correct rather than merely
-     present — anything, as long as it names a number or an observable
-     outcome. -->
-
-
+For at least 4 of my 5 test questions, the answer lives entirely within one retrieved chunk, not split across two adjacent chunks.
 
 **Why this target:**
-
-
-
+My chunk size is small relative to how some source paragraphs are structured, so the real risk isn't "bad chunks" in the abstract, it's a chunk boundary landing in the middle of the one sentence that answers a question.
 ---
 
 <!-- ─────────────────────────────────────────────────────────────────────────
