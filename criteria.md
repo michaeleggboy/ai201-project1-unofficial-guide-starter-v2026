@@ -34,6 +34,23 @@ Every answer the system produces names at least one source document.
 **Why this target:**
 All my questions are pulled directly from the documents, so all corrects answers should be able to reference a document.
 
+> **Revised in unit 2:** Every answer names at least one document that exists
+> in the corpus **and** was among the chunks retrieved for that question, and no
+> answer names a file that doesn't exist. Measured by `scorer.py::cite_check`.
+>
+> **Why revised:** "names a source" doesn't say what a source is, so it can't be
+> checked. An answer ending in "(guide_food.md)" names a source. There is no
+> `guide_food.md` in my corpus. Under the original wording that answer passes,
+> and it is the worst answer the system can produce: a real-sounding filename
+> next to a claim, which is harder to catch than being told nothing.
+>
+> So the revision sorts every filename an answer mentions into three kinds —
+> retrieved, real but not retrieved, and invented. The middle one matters too:
+> a file that exists but wasn't in the chunks the model was given is a file the
+> answer did not come from, whatever it says. This comparison is exact rather
+> than fuzzy, because `guide_seasons.md` and `guide_season.md` differ by one
+> character and only one of them exists.
+
 ---
 
 ## 3. The relevance gate stops out-of-corpus questions

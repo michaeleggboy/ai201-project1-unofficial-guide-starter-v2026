@@ -19,7 +19,7 @@ thing I decided beforehand a correct answer contains.
 What this checks, mapped to criteria.md:
 
   criterion 1  the retrieved chunks contain the answer   -> Verdict.chunks_have_expects
-  criterion 2  every answer names a source               -> Verdict.names_source
+  criterion 2  cites a real, retrieved document          -> cite_check()
   criterion 4  one chunk, one town                       -> audit_chunks()
   criterion 5  near-miss questions get refused           -> audit_near_miss()
 
@@ -209,11 +209,75 @@ def refused(answer: str) -> bool:
     return any(contains(phrase, answer, threshold=90.0) for phrase in _REFUSALS)
 
 
-def sources_named(answer: str, results) -> list[str]:
-    """Which of the retrieved filenames the answer actually cites.
+_FILENAME = re.compile(r"\b[\w-]+\.(?:md|txt|pdf)\b")
 
-    Checks the stem as well as the full filename: "says food.md" and "the food
-    guide" both name the source, and only the first one contains ".md".
+
+def corpus_filenames(corpus: str | None = None) -> set[str]:
+    """Every filename the corpus actually contains.
+
+    Read off disk through the same loader the pipeline uses, so a document that
+    `ingest.py` skips is a document this doesn't believe in either.
+    """
+    from ingest import load_documents
+
+    return {doc.source for doc in load_documents(corpus)}
+
+
+@dataclass
+class Citations:
+    """The filenames an answer named, sorted into the three kinds that matter."""
+
+    grounded: list[str]     # in the corpus AND retrieved for this question
+    unretrieved: list[str]  # in the corpus, but not among the chunks it was given
+    invented: list[str]     # not in the corpus at all
+
+    @property
+    def ok(self) -> bool:
+        """Criterion 2: at least one real, retrieved source and nothing invented."""
+        return bool(self.grounded) and not self.invented
+
+
+def cite_check(answer: str, results, corpus: str | None = None) -> Citations:
+    """Sort an answer's citations into grounded, unretrieved and invented.
+
+    "Names a source" was too loose a thing to measure. An answer that ends with
+    `(guide_food.md)` names a source; there is no guide_food.md. So the question
+    is not whether a filename appeared but whether the file is real and whether
+    it's one the answer was actually given:
+
+      grounded     the file exists and was retrieved. This is a citation.
+      unretrieved  the file exists but wasn't in the chunks the model saw, so
+                   the answer did not come from it, whatever it says.
+      invented     no such file. The model produced a filename shaped like the
+                   ones in the corpus, which is the most convincing kind of
+                   wrong and the reason this function exists.
+
+    Exact matching here, not fuzzy: `guide_seasons.md` and `guide_season.md` are
+    one character apart and one of them doesn't exist. This is the one place in
+    the file where "close enough" is the wrong answer.
+    """
+    retrieved = {r.source for r in results}
+    known = corpus_filenames(corpus)
+
+    grounded, unretrieved, invented = [], [], []
+    for name in sorted(set(_FILENAME.findall(answer))):
+        if name in retrieved:
+            grounded.append(name)
+        elif name in known:
+            unretrieved.append(name)
+        else:
+            invented.append(name)
+
+    return Citations(grounded, unretrieved, invented)
+
+
+def sources_named(answer: str, results) -> list[str]:
+    """Which of the retrieved filenames the answer cites, by name or by stem.
+
+    Fuzzy and forgiving, because this one is about recognising a citation that's
+    there: "says food.md" and "the food guide" both name the source, and only
+    the first contains ".md". `cite_check` is the strict counterpart — it asks
+    whether the file is real, and answers that exactly.
     """
     named = []
     for source in sorted({r.source for r in results}):
@@ -229,18 +293,30 @@ def sources_named(answer: str, results) -> list[str]:
 class Verdict:
     """One answer, measured against every criterion that applies to it."""
 
-    answered: bool                 # not the gate's refusal string
+    answered: bool                 # not a refusal
     answer_has_expects: bool       # the answer says what I said it should
-    names_source: bool             # criterion 2
+    names_source: bool             # criterion 2: a real, retrieved document
     chunks_have_expects: bool      # criterion 1
-    in_one_chunk: bool             # criterion 5
+    in_one_chunk: bool             # the retired criterion 5
     answer_score: float
     best_chunk_score: float
-    cited: list[str] = field(default_factory=list)
+    citations: Citations = field(default_factory=lambda: Citations([], [], []))
+
+    @property
+    def cited(self) -> list[str]:
+        """The documents this answer is entitled to claim. Criterion 2's evidence."""
+        return self.citations.grounded
 
     @property
     def passed(self) -> bool:
-        """The bool `run_eval.py` puts in the Run column."""
+        """The bool `run_eval.py` puts in the Run column.
+
+        An invented filename fails the answer outright, however right the rest
+        of it reads. A wrong fact with a real citation beside it is a mistake; a
+        right fact with a citation to a file that doesn't exist means the whole
+        apparatus of grounding was decorative for that answer, and I'd rather
+        find that in a run column than in a demo.
+        """
         return self.answered and self.answer_has_expects and self.names_source
 
     def summary(self) -> str:
@@ -250,12 +326,16 @@ class Verdict:
         bits = [
             f"answer {self.answer_score:.0f}/100",
             f"best chunk {self.best_chunk_score:.0f}/100",
-            f"cited {', '.join(self.cited) if self.cited else 'nothing'}",
+            f"cited {', '.join(self.cited) if self.cited else 'nothing real'}",
         ]
+        if self.citations.invented:
+            bits.append(f"INVENTED {', '.join(self.citations.invented)}")
+        if self.citations.unretrieved:
+            bits.append(f"cited but not retrieved: {', '.join(self.citations.unretrieved)}")
         if not self.chunks_have_expects:
             bits.append("retrieval missed it (criterion 1)")
         elif not self.in_one_chunk:
-            bits.append("split across chunks (criterion 5)")
+            bits.append("split across chunks (retired criterion 5)")
         return " · ".join(bits)
 
 
@@ -278,17 +358,17 @@ def score(question: str, expects: str, answer: str, results) -> Verdict:
     # question, which is the exact failure criterion 5 was written to catch.
     joined = "\n".join(r.text for r in results)
 
-    cited = sources_named(answer, results)
+    citations = cite_check(answer, results)
 
     return Verdict(
         answered=answered,
         answer_has_expects=contains(expects, claim),
-        names_source=bool(cited),
+        names_source=citations.ok,
         chunks_have_expects=contains(expects, joined),
         in_one_chunk=any(contains(expects, r.text) for r in results),
         answer_score=similarity(expects, claim),
         best_chunk_score=max((similarity(expects, r.text) for r in results), default=0.0),
-        cited=cited,
+        citations=citations,
     )
 
 
