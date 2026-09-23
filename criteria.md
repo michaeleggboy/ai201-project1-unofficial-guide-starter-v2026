@@ -60,6 +60,27 @@ At least 3 of 5 sampled chunks focus on the same topic.
 This is good indicator that chunking will produce good answers. 3 of 5 allows wiggle room in case
 it is difficult to find a topical grouping.
 
+> **Revised in unit 2:** At least 4 of every 5 chunks name exactly one of the
+> region's towns — not two or more, and not none. Measured over every chunk
+> rather than a sample of five, by `scorer.py::audit_chunks`.
+>
+> **Why revised:** I couldn't check "focus on the same topic" the same way
+> twice. There's no test in it — I'd be reading five chunks and deciding how I
+> felt about them, and I'd have felt differently on a different day. Every
+> guide in this corpus is organised by town, so "one town per chunk" is the
+> same idea with something a program can check.
+>
+> It's the same idea because a chunk naming four towns is what "unfocused"
+> actually costs me: it sits close in embedding space to a question about any
+> of the four, answers none of them precisely, and gets retrieved instead of
+> the chunk that would have answered. 4 of 5 rather than 5 of 5 because a few
+> chunks are genuinely regional — the transport summary compares towns on
+> purpose, and should.
+>
+> The target went up, not down. I measure 75 of 115 — 65% — so this is a
+> number I am currently missing, and the point of setting it there is to find
+> out whether paragraph-per-chunk splitting can reach it at all.
+
 ---
 
 ## 5. Your choice
@@ -68,6 +89,47 @@ For at least 4 of my 5 test questions, the answer lives entirely within one retr
 
 **Why this target:**
 My chunk size is small relative to how some source paragraphs are structured, so the real risk isn't "bad chunks" in the abstract, it's a chunk boundary landing in the middle of the one sentence that answers a question.
+
+> **Revised in unit 2:** For all 6 of my near-miss questions — ones this corpus
+> cannot answer but retrieval is confident about — the system says it doesn't
+> have enough information instead of answering. Five ask for a specific the
+> guides never state (the museum's opening hours, a day ticket's price); the
+> sixth asks about a town that does not exist. They're in `NEAR_MISS` in
+> `questions.py`, and `scorer.py::audit_near_miss` runs them.
+>
+> **Why revised:** Not because I missed the original — I met it on all five
+> questions on the first run, and it has told me nothing since. It was a
+> criterion about a risk that turned out not to exist in this corpus, so it
+> can't fail and can't teach me anything. I've kept measuring it anyway
+> (`Verdict.in_one_chunk` in `scorer.py`) because it costs nothing to keep and
+> it's what I'd look at first if criterion 1 ever passes while the answer is
+> wrong. It just isn't worth one of my five criteria any more.
+>
+> What replaced it is a limit I can show. Criterion 3's questions come from a
+> different world and the gate refuses them easily — 0.81 to 0.98 against a 0.6
+> cutoff. That flatters the gate. But the guides mention the museum on Fell
+> Street without its opening hours, day tickets without a price, taxis that
+> must be phoned without a number. Ask for those and retrieval works perfectly:
+> the right chunk comes back at 0.26 to 0.47, closer than any of my five real
+> test questions. The gate cannot refuse them, by construction — it only sees
+> distance, and by that measure these are the best questions it has ever been
+> asked. The only thing between a user and an invented bus fare is the "say you
+> don't have enough information" line in the prompt, which is a request, not a
+> mechanism.
+>
+> The sixth question came out of a typo in my own test set: I had written
+> "Bridgewater" where the corpus says "Brightwater", and the system answered
+> about Brightwater without ever mentioning that I'd named somewhere else. That
+> isn't a spelling problem. Northwater retrieves at 0.424, Swanmouth at 0.468,
+> Reykjavik at 0.597 — every one under the cutoff, every one answered. The gate
+> is matching the shape of "when should I go to X?" and never reads X at all,
+> so a question about a town I invented is indistinguishable to it from a
+> question about a town in the corpus.
+>
+> All 6 of 6, not 5 of 6, because the failure here is a confident fabricated
+> number with a real filename cited next to it. One of those is worse than five
+> refusals, so there's no allowance worth making.
+
 ---
 
 <!-- ─────────────────────────────────────────────────────────────────────────
